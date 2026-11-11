@@ -574,7 +574,18 @@ export function useWorkflowDocumentNodes(deps: WorkflowDocumentNodesDeps) {
 		invalid: INodeCredentialsDetails;
 		type: string;
 	}) {
-		nodes.value.forEach((node: INodeUi) => {
+		// Replace through updateNodeAtIndex (not in-place mutation) so the change is
+		// detected and the workflow is marked dirty, otherwise it never gets saved.
+		const replace = (nodeIndex: number, nodeCredentials: INodeCredentials) => {
+			const changed = updateNodeAtIndex(nodeIndex, {
+				credentials: { ...nodeCredentials, [data.type]: data.credentials },
+			});
+			if (changed) {
+				void onStateDirty.trigger();
+			}
+		};
+
+		nodes.value.forEach((node: INodeUi, nodeIndex: number) => {
 			const nodeCredentials: INodeCredentials | undefined = (node as unknown as INode).credentials;
 			if (!nodeCredentials?.[data.type]) {
 				return;
@@ -586,19 +597,19 @@ export function useWorkflowDocumentNodes(deps: WorkflowDocumentNodesDeps) {
 				typeof nodeCredentialDetails === 'string' &&
 				nodeCredentialDetails === data.invalid.name
 			) {
-				(node.credentials as INodeCredentials)[data.type] = data.credentials;
+				replace(nodeIndex, nodeCredentials);
 				return;
 			}
 
 			if (nodeCredentialDetails.id === null) {
 				if (nodeCredentialDetails.name === data.invalid.name) {
-					(node.credentials as INodeCredentials)[data.type] = data.credentials;
+					replace(nodeIndex, nodeCredentials);
 				}
 				return;
 			}
 
 			if (nodeCredentialDetails.id === data.invalid.id) {
-				(node.credentials as INodeCredentials)[data.type] = data.credentials;
+				replace(nodeIndex, nodeCredentials);
 			}
 		});
 	}
